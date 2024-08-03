@@ -140,8 +140,6 @@ memory_before, cpu_before = track_resource_usage()
 ```python
 grid_search_1 = GridSearchCV(model1, param_grid, cv=3
 ```
-Sure, continuing with the explanation:
-
 ```python
 grid_search_1 = GridSearchCV(model1, param_grid, cv=3, scoring='accuracy')
 start_time = time.time()
