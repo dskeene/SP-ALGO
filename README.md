@@ -7,6 +7,8 @@
 This model utilizies several statistical libraries such as Pandas and Scikit. The data provided was collected from the Supreme Ventures draw results located on their website
 
 
+## DISCLAIMER 
+This project was created by Damoy Skeene, as a experiemental past time project. It is in no shape or form, stable enough to encourage any bets based on numbers predicted. Please use at your own risk. Thank you.
 
 ## Program Breakdown
 
