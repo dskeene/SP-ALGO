@@ -12,8 +12,6 @@ This project was created by Damoy Skeene, as a experiemental past time project. 
 
 ## Program Breakdown
 
-Sure, I'll break down each significant line of your script and explain its purpose:
-
 ```python
 import pandas as pd
 ```
