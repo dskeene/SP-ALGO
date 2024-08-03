@@ -1,3 +1,5 @@
+![image](https://github.com/user-attachments/assets/374de57f-dee9-4c91-9811-d092e185ad16)
+
 # Supreme Ventures - Pick 2 [Predicition Model]
 This model utilizies several statistical libraries such as Pandas and Scikit. The data provided was collected from the Supreme Ventures draw results located on their website
 
