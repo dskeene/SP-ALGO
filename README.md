@@ -12,165 +12,151 @@ This project was created by Damoy Skeene, as a experiemental past time project. 
 
 ## Program Breakdown
 
-### Importing Libraries
+Sure, I'll break down each significant line of your script and explain its purpose:
 
 ```python
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.preprocessing import StandardScaler
-from xgboost import XGBClassifier
-import time
 ```
-
-- **pandas**: For data manipulation and analysis.
-- **sklearn.model_selection**: For splitting data into training and testing sets, and for hyperparameter tuning.
-- **sklearn.ensemble**: For using the RandomForestClassifier (although not used in the final implementation).
-- **sklearn.metrics**: For evaluating the performance of the models.
-- **sklearn.preprocessing**: For normalizing features.
-- **xgboost**: For using the XGBClassifier, a gradient boosting framework.
-- **time**: For measuring the time taken for each step.
-
-### Loading Data
+- **Imports the pandas library**, useful for data manipulation and analysis.
 
 ```python
-# Load data
-file_path = 'p2_draws.csv'
+from sklearn.model_selection import train_test_split, GridSearchCV
+```
+- **Imports tools from scikit-learn**: `train_test_split` for splitting data into training and testing sets, `GridSearchCV` for optimizing model parameters.
+
+```python
+from sklearn.metrics import accuracy_score, classification_report
+```
+- **Imports performance metrics**: `accuracy_score` to measure the accuracy of predictions, `classification_report` to show a detailed classification report including precision, recall, f1-score, etc.
+
+```python
+from sklearn.preprocessing import StandardScaler
+```
+- **Imports `StandardScaler`** for normalizing/standardizing features.
+
+```python
+from xgboost import XGBClassifier
+```
+- **Imports `XGBClassifier` from XGBoost**, a powerful machine learning algorithm that implements gradient boosting framework.
+
+```python
+import time
+```
+- **Imports the time module** to measure execution time.
+
+```python
+import psutil
+```
+- **Imports psutil**, a cross-platform library for accessing system details and process utilities.
+
+```python
+file_path = 'csvfilehere'
 data = pd.read_csv(file_path)
 ```
-
-- **file_path**: Specifies the path to the CSV file containing the data.
-- **data**: Loads the data from the CSV file into a pandas DataFrame.
-
-### Preprocessing Data
+- **Loads data from a CSV file** into a pandas DataFrame.
 
 ```python
 start_time = time.time()
+```
+- **Records the start time** for measuring the duration of the preprocessing step.
+
+```python
 data['Date'] = pd.to_datetime(data['Date'])
 data['DayOfWeek'] = data['Date'].dt.dayofweek
 data['Month'] = data['Date'].dt.month
 ```
-
-- **data['Date']**: Converts the 'Date' column to datetime format.
-- **data['DayOfWeek']**: Extracts the day of the week from the 'Date' column.
-- **data['Month']**: Extracts the month from the 'Date' column.
-
-### Cleaning Data
+- **Converts the 'Date' column to datetime format** and extracts useful features like `DayOfWeek` and `Month`.
 
 ```python
-# Clean the 'Winning Numbers' column
 data['Winning Numbers'] = data['Winning Numbers'].str.strip()
 data = data.dropna(subset=['Winning Numbers'])
 ```
-
-- **data['Winning Numbers']**: Strips any leading or trailing whitespace from the 'Winning Numbers' column.
-- **data.dropna**: Drops rows where 'Winning Numbers' is NaN (missing).
-
-### Splitting and Cleaning Winning Numbers
+- **Cleans the 'Winning Numbers' column** by stripping leading/trailing spaces and dropping any rows where 'Winning Numbers' are NaN.
 
 ```python
-# Ensure the winning numbers are split correctly and remove rows with issues
 split_numbers = data['Winning Numbers'].str.split(expand=True)
 split_numbers = split_numbers.dropna()
 split_numbers = split_numbers[split_numbers.apply(lambda row: row.map(str.isdigit).all(), axis=1)]
 ```
-
-- **split_numbers**: Splits the 'Winning Numbers' column into two separate columns.
-- **split_numbers.dropna**: Drops rows with NaN values in the split columns.
-- **split_numbers.apply**: Keeps only rows where all split values are digits.
-
-### Updating Data with Cleaned Split Numbers
+- **Splits the 'Winning Numbers' into separate columns** and ensures that each entry is a digit, removing any rows with non-digit characters.
 
 ```python
-# Update the original data with cleaned split numbers
 data = data.loc[split_numbers.index]
 data[['WinningNumber1', 'WinningNumber2']] = split_numbers.astype(int)
 ```
-
-- **data.loc**: Keeps only the rows in the original DataFrame that have valid split numbers.
-- **data[['WinningNumber1', 'WinningNumber2']]**: Assigns the cleaned split numbers to new columns and converts them to integers.
-
-### Adjusting Labels
+- **Updates the original data** with cleaned and split numbers, converting them to integers.
 
 ```python
-# Adjust the labels to fit the expected range
 data['WinningNumber1'] -= 1
 data['WinningNumber2'] -= 1
 ```
-
-- **data['WinningNumber1'] -= 1**: Adjusts the first winning number to be zero-based.
-- **data['WinningNumber2'] -= 1**: Adjusts the second winning number to be zero-based.
-
-### Feature Engineering
+- **Adjusts the winning numbers** by subtracting 1 (shift range for zero-indexing purposes).
 
 ```python
-# Feature engineering
 data['WinningNumber1_Freq'] = data['WinningNumber1'].map(data['WinningNumber1'].value_counts())
 data['WinningNumber2_Freq'] = data['WinningNumber2'].map(data['WinningNumber2'].value_counts())
 ```
-
-- **data['WinningNumber1_Freq']**: Creates a feature for the frequency of the first winning number.
-- **data['WinningNumber2_Freq']**: Creates a feature for the frequency of the second winning number.
-
-### Preparing Features and Labels
+- **Creates frequency features** for how often each number has won.
 
 ```python
 X = data[['DayOfWeek', 'Month', 'WinningNumber1_Freq', 'WinningNumber2_Freq']]
 y1 = data['WinningNumber1']
 y2 = data['WinningNumber2']
 ```
-
-- **X**: Features matrix containing 'DayOfWeek', 'Month', 'WinningNumber1_Freq', and 'WinningNumber2_Freq'.
-- **y1**: Labels for the first winning number.
-- **y2**: Labels for the second winning number.
-
-### Normalizing Features
+- **Defines features (X) and labels (y)** for the model.
 
 ```python
-# Normalize features
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 ```
-
-- **scaler**: Initializes a StandardScaler to normalize features.
-- **X_scaled**: Normalizes the feature matrix.
-
-### Splitting Data into Training and Testing Sets
+- **Normalizes the features** to have zero mean and unit variance.
 
 ```python
-# Split data into training and testing sets
 X_train_1, X_test_1, y1_train, y1_test = train_test_split(X_scaled, y1, test_size=0.2, random_state=42)
 X_train_2, X_test_2, y2_train, y2_test = train_test_split(X_scaled, y2, test_size=0.2, random_state=42)
+```
+- **Splits the data into training and testing sets** for two models.
+
+```python
 preprocessing_time = time.time() - start_time
 print(f'Preprocessing Time: {preprocessing_time:.2f} seconds')
 ```
-
-- **train_test_split**: Splits the data into training and testing sets for both winning numbers.
-- **preprocessing_time**: Measures and prints the time taken for preprocessing.
-
-### Hyperparameter Tuning and Model Training
+- **Calculates and prints the preprocessing time**.
 
 ```python
-# Initialize and train models with hyperparameter tuning
 param_grid = {
     'n_estimators': [100, 200],
     'max_depth': [5, 10],
     'learning_rate': [0.01, 0.1]
 }
+```
+- **Defines a grid of hyperparameters** for tuning the models.
 
-model1 = XGBClassifier(random_state=42)
+```python
+memory_before, cpu_before = track_resource_usage()
+```
+- **Tracks memory and CPU usage** before model training.
+
+```python
+grid_search_1 = GridSearchCV(model1, param_grid, cv=3
+```
+Sure, continuing with the explanation:
+
+```python
 grid_search_1 = GridSearchCV(model1, param_grid, cv=3, scoring='accuracy')
 start_time = time.time()
 grid_search_1.fit(X_train_1, y1_train)
 training_time_1 = time.time() - start_time
 ```
+- **Initializes `GridSearchCV`** for `model1` with the parameter grid, using 3-fold cross-validation and accuracy as the scoring metric.
+- **Records the start time** for model training.
+- **Fits `grid_search_1`** to the training data (`X_train_1`, `y1_train`).
+- **Calculates the training time** for the first model.
 
-- **param_grid**: Defines the hyperparameters to be tuned.
-- **model1**: Initializes the XGBClassifier for the first winning number.
-- **grid_search_1**: Initializes GridSearchCV to perform hyperparameter tuning for the first model.
-- **grid_search_1.fit**: Fits the model to the training data and performs hyperparameter tuning.
-- **training_time_1**: Measures and prints the time taken for training the first model.
+```python
+memory_after_1, cpu_after_1 = track_resource_usage()
+```
+- **Tracks memory and CPU usage** after training the first model.
 
 ```python
 model2 = XGBClassifier(random_state=42)
@@ -178,62 +164,128 @@ grid_search_2 = GridSearchCV(model2, param_grid, cv=3, scoring='accuracy')
 start_time = time.time()
 grid_search_2.fit(X_train_2, y2_train)
 training_time_2 = time.time() - start_time
-
-print(f'Model 1 Training Time: {training_time_1:.2f} seconds')
-print(f'Model 2 Training Time: {training_time_2:.2f} seconds')
 ```
-
-- **model2**: Initializes the XGBClassifier for the second winning number.
-- **grid_search_2**: Initializes GridSearchCV to perform hyperparameter tuning for the second model.
-- **grid_search_2.fit**: Fits the model to the training data and performs hyperparameter tuning.
-- **training_time_2**: Measures and prints the time taken for training the second model.
-
-### Evaluating Models
+- **Initializes `GridSearchCV`** for `model2` with the parameter grid, using 3-fold cross-validation and accuracy as the scoring metric.
+- **Records the start time** for model training.
+- **Fits `grid_search_2`** to the training data (`X_train_2`, `y2_train`).
+- **Calculates the training time** for the second model.
 
 ```python
-# Best models from grid search
+memory_after_2, cpu_after_2 = track_resource_usage()
+```
+- **Tracks memory and CPU usage** after training the second model.
+
+```python
+print(f'Model 1 Training Time: {training_time_1:.2f} seconds')
+print(f'Model 1 Memory Usage: {memory_after_1 - memory_before:.2f} MB')
+print(f'Model 1 CPU Usage: {cpu_after_1 - cpu_before:.2f}%')
+```
+- **Prints the training time, memory usage, and CPU usage** for the first model.
+
+```python
+print(f'Model 2 Training Time: {training_time_2:.2f} seconds')
+print(f'Model 2 Memory Usage: {memory_after_2 - memory_before:.2f} MB')
+print(f'Model 2 CPU Usage: {cpu_after_2 - cpu_before:.2f}%')
+```
+- **Prints the training time, memory usage, and CPU usage** for the second model.
+
+```python
 best_model1 = grid_search_1.best_estimator_
 best_model2 = grid_search_2.best_estimator_
+```
+- **Retrieves the best models** found by `GridSearchCV`.
 
-# Evaluate the models
+```python
 y1_pred = best_model1.predict(X_test_1)
 y2_pred = best_model2.predict(X_test_2)
+```
+- **Makes predictions** on the test data using the best models.
 
-# Output model performance
+```python
 accuracy_1 = accuracy_score(y1_test, y1_pred)
 report_1 = classification_report(y1_test, y1_pred)
+```
+- **Calculates the accuracy** and **generates a classification report** for the first model.
 
+```python
 accuracy_2 = accuracy_score(y2_test, y2_pred)
 report_2 = classification_report(y2_test, y2_pred)
+```
+- **Calculates the accuracy** and **generates a classification report** for the second model.
 
+```python
 print(f'Model 1 Accuracy: {accuracy_1}')
 print('Model 1 Classification Report:')
 print(report_1)
+```
+- **Prints the accuracy** and **classification report** for the first model.
 
+```python
 print(f'Model 2 Accuracy: {accuracy_2}')
 print('Model 2 Classification Report:')
 print(report_2)
 ```
-
-- **best_model1**: Retrieves the best estimator from the grid search for the first model.
-- **best_model2**: Retrieves the best estimator from the grid search for the second model.
-- **y1_pred**: Makes predictions on the test set for the first winning number.
-- **y2_pred**: Makes predictions on the test set for the second winning number.
-- **accuracy_score**: Computes the accuracy of the predictions.
-- **classification_report**: Generates a detailed classification report.
-
-### Making Predictions
+- **Prints the accuracy** and **classification report** for the second model.
 
 ```python
-# Making predictions
-# Example of predicting a specific date
-new_data = pd.DataFrame({'DayOfWeek': [2], 'Month': [8], 'WinningNumber1_Freq': [0], 'WinningNumber2_Freq': [0]})  # Example date feature
+unique_dates = data['Date'].unique()
+predictions = []
+```
+- **Retrieves unique dates** from the data.
+- **Initializes a list to store predictions**.
+
+```python
+for date in unique_dates:
+    day_of_week = date.dayofweek
+    month = date.month
+    winning_number1_freq = data['WinningNumber1_Freq'].mean()
+    winning_number2_freq = data['WinningNumber2_Freq'].mean()
+    
+    new_data = pd.DataFrame({
+        'DayOfWeek': [day_of_week], 
+        'Month': [month], 
+        'WinningNumber1_Freq': [winning_number1_freq], 
+        'WinningNumber2_Freq': [winning_number2_freq]
+    })
+    
+    new_data_scaled = scaler.transform(new_data)
+    predicted_number1 = best_model1.predict(new_data_scaled)[0] + 1
+    predicted_number2 = best_model2.predict(new_data_scaled)[0] + 1
+    predictions.append((date, predicted_number1, predicted_number2))
+```
+- **Loops through each unique date** to generate predictions.
+- **Extracts features** (day of the week, month) for the date.
+- **Uses average frequencies** of winning numbers as placeholders.
+- **Creates a DataFrame** with the new data for prediction.
+- **Scales the new data** using the previously fitted scaler.
+- **Makes predictions** using the best models and adjusts the predictions back to the original range by adding 1.
+- **Appends the predictions** to the list.
+
+```python
+for date, num1, num2 in predictions:
+    print(f'Date: {date}, Predicted Winning Numbers: {num1}, {num2}')
+```
+- **Prints the predictions** for each date.
+
+```python
+new_data = pd.DataFrame({'DayOfWeek': [2], 'Month': [8], 'WinningNumber1_Freq': [0], 'WinningNumber2_Freq': [0]})
 new_data_scaled = scaler.transform(new_data)
 start_time = time.time()
 predicted_number1 = best_model1.predict(new_data_scaled)
 predicted_number2 = best_model2.predict(new_data_scaled)
 prediction_time = time.time() - start_time
+predicted_number1 += 1
+predicted_number2 += 1
+print(f'Predicted Winning Numbers: {predicted_number1[0]}, {predicted_number2[0]}')
+print(f'Prediction Time: {prediction_time:.2f} seconds')
 ```
+- **Creates a DataFrame with example features** to make a specific prediction.
+- **Scales the new data**.
+- **Records the start time** for making predictions.
+- **Makes predictions** using the best models.
+- **Calculates the prediction time**.
+- **Adjusts predictions** back to the original range.
+- **Prints the predicted winning numbers and the time taken for the prediction**.
 
 # Running SP-ALGO
 This model can be ran Google Colab, which is a free cloud based Jupyter Notebook. Datasets can be uploaded via google drive and be referenced in code. 
