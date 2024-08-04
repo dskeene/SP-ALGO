@@ -7,6 +7,11 @@
 SP-ALGO is an experimental prediction model, which intends to predict the Supreme Ventures Pick 2 draw results, using frequency analysis and probability based on historical frequency, as well as other advance statistical concepts implemented using Artificial Intelligence. This model utilizies several statistical libraries such as Pandas and Scikit. The data provided was collected from the Supreme Ventures draw results located on their website.
 
 
+## Current Model Accuracy 
+``` Current: V.1 : 25%```
+``` Upcoming: V.2: Untested```
+
+
 ## DISCLAIMER 
 This project was created by Damoy Skeene, as a experiemental past time project. It is in no shape or form, stable enough to encourage any bets based on numbers predicted. Please use at your own risk. Thank you.
 
