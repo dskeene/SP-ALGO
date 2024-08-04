@@ -1,156 +1,105 @@
-#Program was created using experiemental Artificial Intelligence systems, as a well as entry-mid level expertise by Damoy Skeene. Programs will consist of bugs and is currently in it's semi-developed form.
-# Pick 2 Prediction, based on historical data collected from vendor website.
-
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.preprocessing import StandardScaler
-from xgboost import XGBClassifier
-import time
-import psutil
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from kerastuner.tuners import RandomSearch
+from datetime import datetime
 
-# Load data
-file_path = 'csvfilehere'
+# Load and preprocess data
+file_path = '/content/p2_draws.csv'
 data = pd.read_csv(file_path)
-
-# Preprocess data
-start_time = time.time()
 data['Date'] = pd.to_datetime(data['Date'])
-data['DayOfWeek'] = data['Date'].dt.dayofweek
-data['Month'] = data['Date'].dt.month
-
-# Clean the 'Winning Numbers' column
 data['Winning Numbers'] = data['Winning Numbers'].str.strip()
 data = data.dropna(subset=['Winning Numbers'])
 
-# Ensure the winning numbers are split correctly and remove rows with issues
-split_numbers = data['Winning Numbers'].str.split(expand=True)
-split_numbers = split_numbers.dropna()
-split_numbers = split_numbers[split_numbers.apply(lambda row: row.map(str.isdigit).all(), axis=1)]
+# Ensure exactly two numbers per entry
+data = data[data['Winning Numbers'].str.count(' ') == 1]
 
-# Update the original data with cleaned split numbers
-data = data.loc[split_numbers.index]
-data[['WinningNumber1', 'WinningNumber2']] = split_numbers.astype(int)
-
-# Adjust the labels to fit the expected range
-data['WinningNumber1'] -= 1
-data['WinningNumber2'] -= 1
+# Split winning numbers into two separate columns
+data[['WinningNumber1', 'WinningNumber2']] = data['Winning Numbers'].str.split(expand=True).astype(int)
 
 # Feature engineering
-data['WinningNumber1_Freq'] = data['WinningNumber1'].map(data['WinningNumber1'].value_counts())
-data['WinningNumber2_Freq'] = data['WinningNumber2'].map(data['WinningNumber2'].value_counts())
+data['DayOfWeek'] = data['Date'].dt.dayofweek
+data['Month'] = data['Date'].dt.month
 
-X = data[['DayOfWeek', 'Month', 'WinningNumber1_Freq', 'WinningNumber2_Freq']]
-y1 = data['WinningNumber1']
-y2 = data['WinningNumber2']
+# Combine features
+data = data.loc[:, ['DayOfWeek', 'Month', 'WinningNumber1', 'WinningNumber2']]
 
-# Normalize features
-scaler = StandardScaler()
+# Prepare features and labels
+X = data[['DayOfWeek', 'Month', 'WinningNumber1', 'WinningNumber2']].values
+y1 = data['WinningNumber1'].values
+y2 = data['WinningNumber2'].values
+
+# Normalize the data
+scaler = MinMaxScaler(feature_range=(0, 1))
 X_scaled = scaler.fit_transform(X)
 
+# Create sequences
+def create_sequences(X, y, time_steps=10):
+    Xs, ys = [], []
+    for i in range(len(X) - time_steps):
+        Xs.append(X[i:(i + time_steps)])
+        ys.append(y[i + time_steps])
+    return np.array(Xs), np.array(ys)
+
+time_steps = 10
+X1_seq, y1_seq = create_sequences(X_scaled, y1, time_steps)
+X2_seq, y2_seq = create_sequences(X_scaled, y2, time_steps)
+
 # Split data into training and testing sets
-X_train_1, X_test_1, y1_train, y1_test = train_test_split(X_scaled, y1, test_size=0.2, random_state=42)
-X_train_2, X_test_2, y2_train, y2_test = train_test_split(X_scaled, y2, test_size=0.2, random_state=42)
-preprocessing_time = time.time() - start_time
-print(f'Preprocessing Time: {preprocessing_time:.2f} seconds')
+split = int(0.8 * len(X1_seq))
+X1_train, X1_test = X1_seq[:split], X1_seq[split:]
+y1_train, y1_test = y1_seq[:split], y1_seq[split:]
 
-# Initialize and train models with hyperparameter tuning
-param_grid = {
-    'n_estimators': [100, 200],
-    'max_depth': [5, 10],
-    'learning_rate': [0.01, 0.1]
-}
+X2_train, X2_test = X2_seq[:split], X2_seq[split:]
+y2_train, y2_test = y2_seq[:split], y2_seq[split:]
 
-def track_resource_usage():
-    process = psutil.Process()
-    memory_info = process.memory_info()
-    return memory_info.rss / (1024 * 1024), process.cpu_percent(interval=1)
+# Hyperparameter tuning function
+def build_model(hp):
+    model = Sequential()
+    model.add(LSTM(units=hp.Int('units', min_value=32, max_value=256, step=32),
+                   return_sequences=True, input_shape=(time_steps, X_scaled.shape[1])))
+    model.add(Dropout(hp.Float('dropout_rate', min_value=0.0, max_value=0.5, step=0.1)))
+    model.add(LSTM(units=hp.Int('units', min_value=32, max_value=256, step=32)))
+    model.add(Dropout(hp.Float('dropout_rate', min_value=0.0, max_value=0.5, step=0.1)))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
 
-memory_before, cpu_before = track_resource_usage()
+# Hyperparameter tuning with Keras Tuner
+tuner = RandomSearch(
+    build_model,
+    objective='val_loss',
+    max_trials=10,
+    executions_per_trial=2,
+    directory='tuner',
+    project_name='lstm_tuning'
+)
 
-model1 = XGBClassifier(random_state=42)
-grid_search_1 = GridSearchCV(model1, param_grid, cv=3, scoring='accuracy')
-start_time = time.time()
-grid_search_1.fit(X_train_1, y1_train)
-training_time_1 = time.time() - start_time
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
-memory_after_1, cpu_after_1 = track_resource_usage()
+# Train the models
+tuner.search(X1_train, y1_train, epochs=50, batch_size=16, validation_split=0.2, callbacks=[early_stopping])
+best_model1 = tuner.get_best_models(num_models=1)[0]
 
-model2 = XGBClassifier(random_state=42)
-grid_search_2 = GridSearchCV(model2, param_grid, cv=3, scoring='accuracy')
-start_time = time.time()
-grid_search_2.fit(X_train_2, y2_train)
-training_time_2 = time.time() - start_time
-
-memory_after_2, cpu_after_2 = track_resource_usage()
-
-print(f'Model 1 Training Time: {training_time_1:.2f} seconds')
-print(f'Model 1 Memory Usage: {memory_after_1 - memory_before:.2f} MB')
-print(f'Model 1 CPU Usage: {cpu_after_1 - cpu_before:.2f}%')
-
-print(f'Model 2 Training Time: {training_time_2:.2f} seconds')
-print(f'Model 2 Memory Usage: {memory_after_2 - memory_before:.2f} MB')
-print(f'Model 2 CPU Usage: {cpu_after_2 - cpu_before:.2f}%')
-
-# Best models from grid search
-best_model1 = grid_search_1.best_estimator_
-best_model2 = grid_search_2.best_estimator_
+tuner.search(X2_train, y2_train, epochs=50, batch_size=16, validation_split=0.2, callbacks=[early_stopping])
+best_model2 = tuner.get_best_models(num_models=1)[0]
 
 # Evaluate the models
-y1_pred = best_model1.predict(X_test_1)
-y2_pred = best_model2.predict(X_test_2)
+loss1 = best_model1.evaluate(X1_test, y1_test)
+loss2 = best_model2.evaluate(X2_test, y2_test)
+print(f'Model 1 Test Loss: {loss1}')
+print(f'Model 2 Test Loss: {loss2}')
 
-# Output model performance
-accuracy_1 = accuracy_score(y1_test, y1_pred)
-report_1 = classification_report(y1_test, y1_pred)
+# Make predictions
+def predict_next(model, data, time_steps):
+    prediction = model.predict(data[-time_steps:].reshape(1, time_steps, data.shape[1]))
+    return prediction[0][0]
 
-accuracy_2 = accuracy_score(y2_test, y2_pred)
-report_2 = classification_report(y2_test, y2_pred)
+next_number1 = predict_next(best_model1, X_scaled, time_steps)
+next_number2 = predict_next(best_model2, X_scaled, time_steps)
 
-print(f'Model 1 Accuracy: {accuracy_1}')
-print('Model 1 Classification Report:')
-print(report_1)
-
-print(f'Model 2 Accuracy: {accuracy_2}')
-print('Model 2 Classification Report:')
-print(report_2)
-
-# Making predictions for each day
-unique_dates = data['Date'].unique()
-predictions = []
-
-for date in unique_dates:
-    day_of_week = date.dayofweek
-    month = date.month
-    # Use average frequencies as placeholders
-    winning_number1_freq = data['WinningNumber1_Freq'].mean()
-    winning_number2_freq = data['WinningNumber2_Freq'].mean()
-    
-    new_data = pd.DataFrame({
-        'DayOfWeek': [day_of_week], 
-        'Month': [month], 
-        'WinningNumber1_Freq': [winning_number1_freq], 
-        'WinningNumber2_Freq': [winning_number2_freq]
-    })
-    
-    new_data_scaled = scaler.transform(new_data)
-    predicted_number1 = best_model1.predict(new_data_scaled)[0] + 1
-    predicted_number2 = best_model2.predict(new_data_scaled)[0] + 1
-    predictions.append((date, predicted_number1, predicted_number2))
-
-# Print predictions for each day
-for date, num1, num2 in predictions:
-    print(f'Date: {date}, Predicted Winning Numbers: {num1}, {num2}')
-
-# Making a prediction for a specific date example
-new_data = pd.DataFrame({'DayOfWeek': [2], 'Month': [8], 'WinningNumber1_Freq': [0], 'WinningNumber2_Freq': [0]})  # Example date feature
-new_data_scaled = scaler.transform(new_data)
-start_time = time.time()
-predicted_number1 = best_model1.predict(new_data_scaled)
-predicted_number2 = best_model2.predict(new_data_scaled)
-prediction_time = time.time() - start_time
-# Adjust predictions back to the original range
-predicted_number1 += 1
-predicted_number2 += 1
-print(f'Predicted Winning Numbers: {predicted_number1[0]}, {predicted_number2[0]}')
-print(f'Prediction Time: {prediction_time:.2f} seconds')
+print(f"Predicted Winning Numbers: {round(next_number1)}, {round(next_number2)}")
