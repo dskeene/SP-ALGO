@@ -64,7 +64,7 @@ from datetime import datetime
 
 ### Load and Preprocess Data
 ```python
-file_path = '/content/p2_draws.csv'
+file_path = '/path/datacsv'
 data = pd.read_csv(file_path)
 ```
 - **Loads the data**: Reads the CSV file into a pandas DataFrame.
