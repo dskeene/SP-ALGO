@@ -9,7 +9,7 @@ from kerastuner.tuners import RandomSearch
 from datetime import datetime
 
 # Load and preprocess data
-file_path = '/content/p2_draws.csv'
+file_path = '/path/datacsv'
 data = pd.read_csv(file_path)
 data['Date'] = pd.to_datetime(data['Date'])
 data['Winning Numbers'] = data['Winning Numbers'].str.strip()
